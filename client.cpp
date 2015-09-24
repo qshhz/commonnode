@@ -73,7 +73,7 @@ int client()
 //		cout<<"time elapsed: "<< chrono::duration_cast<chrono::microseconds>((chrono::system_clock::now() - start)).count() / 1000.0<<endl;
 //		cout<<"time elapsed: "<< chrono::duration_cast<chrono::microseconds>((chrono::system_clock::now() - start)).count() / 1000.0<<endl;
 		close(sockfd);
-		std::this_thread::sleep_for(chrono::seconds(20));
+		std::this_thread::sleep_for(chrono::seconds(2));
 	}
 	printf("%s\n", buffer);
 	return 0;

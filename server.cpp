@@ -40,6 +40,8 @@ C or C++ with standard TCP and UDP socket calls is probably going to be the fast
 success on this task but we will accept alternative approaches.
 */
 
+#define BUFLEN 256*1024
+
 class ComNode{
 public:
 	void list()
@@ -53,189 +55,144 @@ public:
 		return os;
 	}
 
-	void init_server_side()
+	void run_server()
 	{
-//		struct sockaddr_in serv_addr, cli_addr;
-//		int n;
-//		sockfd = socket(AF_INET, SOCK_STREAM, 0);
-//		if (sockfd < 0)
-//			cerr << ("ERROR opening socket");
-//		memset((char *) &serv_addr, 0, sizeof(serv_addr));
-//		portno = 50000;//atoi(argv[1]);
-//		serv_addr.sin_family = AF_INET;
-//		serv_addr.sin_addr.s_addr = INADDR_ANY;
-//		serv_addr.sin_port = htons(portno);
+		char buffer[BUFLEN];
+		int n;
+		listen(sockfd_s, 5);
+		clilen = sizeof(cli_addr);
+		while(true)
+		{
+			newsockfd = accept(sockfd_s, (struct sockaddr *) &cli_addr, &clilen);
+			if (newsockfd < 0)
+				cerr << ("server: ERROR on accept\n");
+			memset(buffer, 0, BUFLEN);
+			n = read(newsockfd, buffer, BUFLEN - 1);
+			if (n < 0)
+				cerr << ("server: ERROR reading from socket\n");
+//			cerr<<"Here is the message:"<<buffer<<"\n";
+			n = write(newsockfd, "I got your message", 18);
+			if (n < 0)
+				cerr << ("server: ERROR writing to socket\n");
+			close(newsockfd);
+		}
 	}
-private:
-	string uuid;
-	set<ComNode> nodes;
-};
 
-
-struct Node
-{
-	Node():sockfd(socket(AF_INET, SOCK_STREAM, 0)),portno(5000)
+	void close_server()
 	{
+		close(sockfd_s);
+	}
+
+	int init_server_side()
+	{
+		int portno = 50000;
+		sockfd_s = socket(AF_INET, SOCK_STREAM, 0);
+		if (sockfd_s < 0)
+		{
+			cerr << ("server: ERROR opening socket!\n");
+			return -1;
+		}
+		memset((char *) &serv_addr, 0, sizeof(serv_addr));
+
 		serv_addr.sin_family = AF_INET;
 		serv_addr.sin_addr.s_addr = INADDR_ANY;
 		serv_addr.sin_port = htons(portno);
+		if (bind(sockfd_s, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) < 0)
+		{
+			cerr << ("server: ERROR on binding! \n");
+			return -1;
+		}
+		server_t = thread([this] {run_server(); });
+
+		return 0;
 	}
-	int sockfd, newsockfd, portno;
+
+
+	void run_client()
+	{
+		char buffer[BUFLEN];
+		int n;
+		while(true)
+		{
+			int portno = 50000;
+			sockfd_c = socket(AF_INET, SOCK_STREAM, 0);
+			serv_addr.sin_port = htons(portno);
+			if (sockfd_c < 0)
+			{
+				cerr<<("client: ERROR opening socket\n");
+				perror(NULL);
+				std::this_thread::sleep_for(chrono::seconds(5));
+			}
+			auto start = chrono::system_clock::now();
+
+			if (connect(sockfd_c, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) < 0)
+				perror("client: ERROR connecting\n");
+			auto end = chrono::system_clock::now();
+			cout<<"10.0.10.231"<<"\tlatency: "<< (chrono::duration_cast<chrono::microseconds>(end - start).count() / 1000.0)<<"ms\t\t";
+			start = end;
+
+			n = write(sockfd_c, buffer, sizeof(buffer));
+			if (n < 0)
+				cerr<<("client: ERROR writing to socket\n");
+			end = chrono::system_clock::now();
+			cout<<"bandwidth: "<< BUFLEN*1000/1024.0/chrono::duration_cast<chrono::microseconds>(end - start).count()<<endl;
+
+			close(sockfd_c);
+			std::this_thread::sleep_for(chrono::seconds(2));
+		}
+	}
+
+	int close_client()
+	{
+		return close(sockfd_c);
+	}
+
+	int init_client_side()
+	{
+		struct sockaddr_in serv_addr;
+		struct hostent *server;
+
+		server = gethostbyname("10.0.10.231");
+		if (server == NULL)
+		{
+			cerr << "ERROR, no such host!\n";
+			return -1;
+		}
+		memset((char *) &serv_addr, 0, sizeof(serv_addr));
+		serv_addr.sin_family = AF_INET;
+		memcpy((char *) server->h_addr, (char *) &serv_addr.sin_addr.s_addr,
+				server->h_length);
+
+		client_t = thread([this] {run_client(); });
+		return 0;
+	}
+
+private:
+	int sockfd_s, newsockfd;
+	int sockfd_c;
 	socklen_t clilen;
 	struct sockaddr_in serv_addr, cli_addr;
-};
 
-#define BUFLEN 256*1024
+	string uuid;
+	set<ComNode> nodes;
+
+public:
+	thread client_t;
+	thread server_t;
+};
 
 
 int main(int argc, char *argv[])
 {
-	int sockfd, newsockfd, portno;
-	socklen_t clilen;
-	char buffer[BUFLEN];
-	struct sockaddr_in serv_addr, cli_addr;
-	int n;
-	sockfd = socket(AF_INET, SOCK_STREAM, 0);
-	if (sockfd < 0)
-		cerr << ("ERROR opening socket");
-	memset((char *) &serv_addr, 0, sizeof(serv_addr));
-	portno = 50000;//atoi(argv[1]);
-	serv_addr.sin_family = AF_INET;
-	serv_addr.sin_addr.s_addr = INADDR_ANY;
-	serv_addr.sin_port = htons(portno);
-	if (bind(sockfd, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) < 0)
-		cerr << ("ERROR on binding");
-	while(true)
-	{
-		listen(sockfd, 5);
-		clilen = sizeof(cli_addr);
-		newsockfd = accept(sockfd, (struct sockaddr *) &cli_addr, &clilen);
-		if (newsockfd < 0)
-			cerr << ("ERROR on accept");
-		memset(buffer, 0, BUFLEN);
-		n = read(newsockfd, buffer, BUFLEN - 1);
-		if (n < 0)
-			cerr << ("ERROR reading from socket");
-		printf("Here is the message: %s\n", buffer);
-		n = write(newsockfd, "I got your message", 18);
-		if (n < 0)
-			cerr << ("ERROR writing to socket");
-		close(newsockfd);
-	}
-	close(sockfd);
-	return 0;
-}
+	ComNode cn;
+	cn.init_server_side();
+	cn.init_client_side();
+	cn.server_t.join();
+	cn.client_t.join();
 
-
-
-
-/*
-#define BLKSIZE 128*1024
-
-using namespace std;
-
-thread t;
-mutex wmt;
-mutex rmt;
-condition_variable cv;
-
-int gp;
-int gp_hd;
-//bool cv_f = false;
-
-template<typename T=size_t>
-struct Arg
-{
-	Arg():exit(false), arg(0)
-	{}
-
-	Arg(T t, bool b=false):exit(b), arg(t)
-	{}
-
-	friend ostream& operator<<(ostream&os, Arg& arg)
-	{
-		os <<"Arg: " << arg.arg << " / " << arg.exit<<endl;
-		return os;
-	}
-
-	bool exit;
-	T arg;
-};
-
-vector<Arg<>> g_v;
-bool exit_f = false;
-const char* fn = "/media/SamsungSSD/test";
-const char* fn1 = "/px/mfs/10.0.10.150/media/gai_nfs_1/test";
-
-void tfun(vector<Arg<>> &arg)
-{
-	while(true)
-	{
-		unique_lock<mutex> lock(wmt);
-		while(g_v.size() < 1)
-		{
-			if(exit_f && g_v.size() == 0)
-			{
-				break;
-			}
-			cv.wait(lock);
-		}
-
-		if(exit_f && g_v.size() == 0)
-		{
-			cout<<"\nexiting ...\n";
-			lock.unlock();
-			break;
-		}
-		Arg<> arg = g_v[0];
-		g_v.erase(g_v.begin());
-		lock.unlock();
-
-		char str[BLKSIZE];
-		ssize_t re = pread(gp, str, BLKSIZE, BLKSIZE*(arg.arg));
-		assert(re == BLKSIZE);
-		re = pwrite(gp_hd, str, BLKSIZE, BLKSIZE*(arg.arg));
-		cout<<"thread "<<arg;
-		cout.flush();
-		assert(re == BLKSIZE);
-	}
-}
-
-#include <unistd.h>
-#include <fcntl.h>
-int main(void)
-{
-	gp = open(fn, O_CREAT | O_RDWR, S_IRUSR|S_IWUSR);
-	gp_hd = open(fn1, O_CREAT | O_WRONLY, S_IRUSR|S_IWUSR);
-	char str[BLKSIZE]="sdfasd";
-
-//	Arg arg;
-	t = thread(tfun, ref(g_v));
-
-	for(size_t i=0; i<111150; i++)
-	{
-		Arg<> arg(i);
-		cout<<"main "<<arg;
-		cout.flush();
-		ssize_t re = pwrite(gp, str, BLKSIZE, BLKSIZE*(i));
-		assert(re == BLKSIZE);
-		unique_lock<mutex> lock(wmt);
-		g_v.push_back(arg);
-		cv.notify_one();
-		lock.unlock();
-	}
-//	sleep(1);
-
-	{
-		unique_lock<mutex> lock(wmt);
-		Arg<> arg(1, true);
-		exit_f = true;
-		cv.notify_one();
-		lock.unlock();
-	}
-
-	t.join();
+	cn.close_server();
+	cn.close_client();
 
 	return 0;
 }
-*/
+
