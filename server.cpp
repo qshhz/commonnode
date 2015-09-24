@@ -41,83 +41,46 @@ success on this task but we will accept alternative approaches.
 */
 
 #define BUFLEN 256*1024
+#define DEFAULTPORT 50000
+// newer com node stops if avaiable port number is greater MAXPORT
+#define MAXPORT 60000
+#define LOCALHOST "127.0.0.1"
 
-class ComNode{
+class Base_node{
 public:
-	void list()
+	virtual ~Base_node()
 	{
-
+		join();
+	}
+	virtual void run()=0;
+	virtual int init()=0;
+	virtual int close_node()
+	{
+		return close(sockfd);
+	}
+	virtual void join()
+	{
+		thd.join();
 	}
 
-	friend ostream& operator<<(ostream &os, ComNode& node)
-	{
-		os<<node.uuid;
-		return os;
-	}
+protected:
+	int sockfd, portno;
+	struct sockaddr_in addr;
+	thread thd;
+};
 
-	void run_server()
-	{
-		char buffer[BUFLEN];
-		int n;
-		listen(sockfd_s, 5);
-		clilen = sizeof(cli_addr);
-		while(true)
-		{
-			newsockfd = accept(sockfd_s, (struct sockaddr *) &cli_addr, &clilen);
-			if (newsockfd < 0)
-				cerr << ("server: ERROR on accept\n");
-			memset(buffer, 0, BUFLEN);
-			n = read(newsockfd, buffer, BUFLEN - 1);
-			if (n < 0)
-				cerr << ("server: ERROR reading from socket\n");
-//			cerr<<"Here is the message:"<<buffer<<"\n";
-			n = write(newsockfd, "I got your message", 18);
-			if (n < 0)
-				cerr << ("server: ERROR writing to socket\n");
-			close(newsockfd);
-		}
-	}
-
-	void close_server()
-	{
-		close(sockfd_s);
-	}
-
-	int init_server_side()
-	{
-		int portno = 50000;
-		sockfd_s = socket(AF_INET, SOCK_STREAM, 0);
-		if (sockfd_s < 0)
-		{
-			cerr << ("server: ERROR opening socket!\n");
-			return -1;
-		}
-		memset((char *) &serv_addr, 0, sizeof(serv_addr));
-
-		serv_addr.sin_family = AF_INET;
-		serv_addr.sin_addr.s_addr = INADDR_ANY;
-		serv_addr.sin_port = htons(portno);
-		if (bind(sockfd_s, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) < 0)
-		{
-			cerr << ("server: ERROR on binding! \n");
-			return -1;
-		}
-		server_t = thread([this] {run_server(); });
-
-		return 0;
-	}
-
-
-	void run_client()
+class Client_node:public Base_node{
+public:
+	void run()
 	{
 		char buffer[BUFLEN];
 		int n;
 		while(true)
 		{
-			int portno = 50000;
-			sockfd_c = socket(AF_INET, SOCK_STREAM, 0);
-			serv_addr.sin_port = htons(portno);
-			if (sockfd_c < 0)
+			portno = DEFAULTPORT;
+			sockfd = socket(AF_INET, SOCK_STREAM, 0);
+			addr.sin_port = htons(portno);
+			if (sockfd < 0)
 			{
 				cerr<<("client: ERROR opening socket\n");
 				perror(NULL);
@@ -125,73 +88,124 @@ public:
 			}
 			auto start = chrono::system_clock::now();
 
-			if (connect(sockfd_c, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) < 0)
-				perror("client: ERROR connecting\n");
+			if (connect(sockfd, (struct sockaddr *) &addr, sizeof(addr)) < 0)
+			{
+				cerr<<"client: ERROR connecting to host:"<<servername<<" port:"<<portno;
+				perror(NULL);
+			}
 			auto end = chrono::system_clock::now();
-			cout<<"10.0.10.231"<<"\tlatency: "<< (chrono::duration_cast<chrono::microseconds>(end - start).count() / 1000.0)<<"ms\t\t";
+			cout<<"host: "<<servername<<"\t\tport: " <<portno<<"\tlatency: "<< (chrono::duration_cast<chrono::microseconds>(end - start).count() / 1000.0)<<"ms\t";
 			start = end;
 
-			n = write(sockfd_c, buffer, sizeof(buffer));
+			n = write(sockfd, buffer, sizeof(buffer));
 			if (n < 0)
 				cerr<<("client: ERROR writing to socket\n");
 			end = chrono::system_clock::now();
 			cout<<"bandwidth: "<< BUFLEN*1000/1024.0/chrono::duration_cast<chrono::microseconds>(end - start).count()<<endl;
 
-			close(sockfd_c);
+			close(sockfd);
 			std::this_thread::sleep_for(chrono::seconds(2));
 		}
 	}
 
-	int close_client()
+	int init()
 	{
-		return close(sockfd_c);
-	}
-
-	int init_client_side()
-	{
-		struct sockaddr_in serv_addr;
 		struct hostent *server;
-
-		server = gethostbyname("10.0.10.231");
+		servername = LOCALHOST;
+		server = gethostbyname(servername.c_str());
+//		server = gethostbyname(LOCALHOST);
 		if (server == NULL)
 		{
 			cerr << "ERROR, no such host!\n";
 			return -1;
 		}
-		memset((char *) &serv_addr, 0, sizeof(serv_addr));
-		serv_addr.sin_family = AF_INET;
-		memcpy((char *) server->h_addr, (char *) &serv_addr.sin_addr.s_addr,
+		memset((char *) &addr, 0, sizeof(addr));
+		addr.sin_family = AF_INET;
+		memcpy((char *) server->h_addr, (char *) &addr.sin_addr.s_addr,
 				server->h_length);
 
-		client_t = thread([this] {run_client(); });
+		thd = thread([=] {run(); });
 		return 0;
 	}
 
 private:
-	int sockfd_s, newsockfd;
-	int sockfd_c;
-	socklen_t clilen;
-	struct sockaddr_in serv_addr, cli_addr;
+	string servername;
+};
 
-	string uuid;
-	set<ComNode> nodes;
-
+class Server_node:public Base_node{
 public:
-	thread client_t;
-	thread server_t;
+	void run()
+	{
+		char buffer[BUFLEN];
+		int n;
+		listen(sockfd, 5);
+		struct sockaddr_in cli_addr;
+		socklen_t clilen = sizeof(cli_addr);
+		while(true)
+		{
+			int newsockfd = accept(sockfd, (struct sockaddr *) &cli_addr, &clilen);
+			if (newsockfd < 0)
+				cerr << ("server: ERROR on accept\n");
+			memset(buffer, 0, BUFLEN);
+			n = read(newsockfd, buffer, BUFLEN - 1);
+			if (n < 0)
+				cerr << ("server: ERROR reading from socket\n");
+			n = write(newsockfd, "I got your message", BUFLEN - 1);
+			if (n < 0)
+				cerr << ("server: ERROR writing to socket\n");
+			close(newsockfd);
+		}
+	}
+
+	int init()
+	{
+		portno = DEFAULTPORT;
+		sockfd = socket(AF_INET, SOCK_STREAM, 0);
+		if (sockfd < 0)
+		{
+			cerr << ("server: ERROR opening socket!\n");
+			return -1;
+		}
+		memset((char *) &addr, 0, sizeof(addr));
+
+		addr.sin_family = AF_INET;
+		addr.sin_addr.s_addr = INADDR_ANY;
+		addr.sin_port = htons(portno);
+		cout << "server try binding port:"<< portno<<"...\n";
+		while (bind(sockfd, (struct sockaddr *) &addr, sizeof(addr)) < 0)
+		{
+			addr.sin_port = htons(++portno);
+			cerr <<"server: ERROR on binding! retry with increnment port:"<< portno<<"...\n";
+			if (portno > MAXPORT)
+			{
+				cerr << ("server: ERROR on binding! exceed maxport number, aborting...\n");
+				exit(1); // newer com node stops if avaiable port number is greater MAXPORT
+			}
+		}
+		cout << "server successfully binds port:"<< portno<<"...\n";
+
+		thd = thread([=] {run(); });
+
+		return 0;
+	}
+};
+
+class ComNode
+{
+
+	int port;
 };
 
 
 int main(int argc, char *argv[])
 {
-	ComNode cn;
-	cn.init_server_side();
-	cn.init_client_side();
-	cn.server_t.join();
-	cn.client_t.join();
+	Server_node sn;
+	sn.init();
+	Client_node cn;
+	cn.init();
 
-	cn.close_server();
-	cn.close_client();
+	sn.join();
+	cn.join();
 
 	return 0;
 }
