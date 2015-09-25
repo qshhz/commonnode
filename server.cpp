@@ -46,6 +46,28 @@ success on this task but we will accept alternative approaches.
 #define MAXPORT 60000
 #define LOCALHOST "127.0.0.1"
 
+
+#include <sys/utsname.h>
+#include <arpa/inet.h>
+
+class Util
+{
+public:
+	static string getLocalIp()
+	{
+		struct utsname utsname;
+		struct hostent *h;
+		uname(&utsname);
+
+		if (!(h = gethostbyname(utsname.nodename)))
+		{
+			return LOCALHOST; // default string
+		}
+
+		return string(inet_ntoa(*((struct in_addr *) h->h_addr)));
+	}
+};
+
 class Base_node{
 public:
 	virtual ~Base_node()
@@ -74,10 +96,11 @@ public:
 	void run()
 	{
 		char buffer[BUFLEN];
+		portno = DEFAULTPORT;
+		sprintf(buffer, "%s %d", serverip.c_str(), portno);
 		int n;
 		while(true)
 		{
-			portno = DEFAULTPORT;
 			sockfd = socket(AF_INET, SOCK_STREAM, 0);
 			addr.sin_port = htons(portno);
 			if (sockfd < 0)
@@ -90,11 +113,11 @@ public:
 
 			if (connect(sockfd, (struct sockaddr *) &addr, sizeof(addr)) < 0)
 			{
-				cerr<<"client: ERROR connecting to host:"<<servername<<" port:"<<portno;
+				cerr<<"client: ERROR connecting to host:"<<serverip<<" port:"<<portno;
 				perror(NULL);
 			}
 			auto end = chrono::system_clock::now();
-			cout<<"host: "<<servername<<"\t\tport: " <<portno<<"\tlatency: "<< (chrono::duration_cast<chrono::microseconds>(end - start).count() / 1000.0)<<"ms\t";
+			cout<<"host: "<<serverip<<"\t\tport: " <<portno<<"\tlatency: "<< (chrono::duration_cast<chrono::microseconds>(end - start).count() / 1000.0)<<"ms\t";
 			start = end;
 
 			n = write(sockfd, buffer, sizeof(buffer));
@@ -111,8 +134,8 @@ public:
 	int init()
 	{
 		struct hostent *server;
-		servername = LOCALHOST;
-		server = gethostbyname(servername.c_str());
+		serverip = Util::getLocalIp();
+		server = gethostbyname(serverip.c_str());
 //		server = gethostbyname(LOCALHOST);
 		if (server == NULL)
 		{
@@ -128,12 +151,26 @@ public:
 		return 0;
 	}
 
+	void insertNode(string neighborid)
+	{
+		neighbors.insert(neighborid);
+		for(auto id:neighbors)
+		{
+			cout<< neighborid<<endl;
+		}
+	}
+
 private:
-	string servername;
+	string serverip;
+	set<string> neighbors;
 };
 
 class Server_node:public Base_node{
 public:
+//	Server_node(int port):portno(port)
+//	{
+//	}
+
 	void run()
 	{
 		char buffer[BUFLEN];
@@ -145,11 +182,13 @@ public:
 		{
 			int newsockfd = accept(sockfd, (struct sockaddr *) &cli_addr, &clilen);
 			if (newsockfd < 0)
-				cerr << ("server: ERROR on accept\n");
+				cerr << ("\nserver: ERROR on accept\n");
 			memset(buffer, 0, BUFLEN);
 			n = read(newsockfd, buffer, BUFLEN - 1);
 			if (n < 0)
 				cerr << ("server: ERROR reading from socket\n");
+			cout<<"server: "<<buffer<<endl;
+
 			n = write(newsockfd, "I got your message", BUFLEN - 1);
 			if (n < 0)
 				cerr << ("server: ERROR writing to socket\n");
@@ -192,20 +231,42 @@ public:
 
 class ComNode
 {
+public:
+	ComNode()//:port(DEFAULTPORT)
+	{
+		port = 0;
+//		sn = new Server_node();
+//		cn = new Client_node();
+	}
 
+	void start()
+	{
+		sn.init();
+		cn.init();
+
+		sn.join();
+		cn.join();
+	}
+private:
+	Server_node sn;
+	Client_node cn;
 	int port;
 };
 
 
 int main(int argc, char *argv[])
 {
-	Server_node sn;
-	sn.init();
-	Client_node cn;
-	cn.init();
-
-	sn.join();
-	cn.join();
+//	cout<<Util::getLocalIp();
+//	return 0;
+//	Server_node sn;
+//	sn.init();
+//	Client_node cn;
+//	cn.init();
+//
+//	sn.join();
+//	cn.join();
+	ComNode cn;
+	cn.start();
 
 	return 0;
 }
