@@ -45,6 +45,7 @@ success on this task but we will accept alternative approaches.
 // newer com node stops if avaiable port number is greater MAXPORT
 #define MAXPORT 60000
 #define LOCALHOST "127.0.0.1"
+#define SLEEPDURATION 8
 
 
 #include <sys/utsname.h>
@@ -65,6 +66,38 @@ public:
 		}
 
 		return string(inet_ntoa(*((struct in_addr *) h->h_addr)));
+	}
+
+	static void splitIpPort(string ipandport, vector<string>& v)
+	{
+		string ip = "";
+		string port = "";
+
+		bool flag = false;
+		size_t i=0;
+		while(ipandport[i] == ' ')
+		{
+			i ++;
+		}
+		for(; i<ipandport.size(); i++)
+		{
+			if (ipandport[i] == ' ')
+			{
+				flag = true;
+				continue;
+			}
+			if(flag)
+			{
+				port += ipandport[i];
+			}
+			else
+			{
+				ip += ipandport[i];
+			}
+		}
+
+		v.push_back(ip);
+		v.push_back(port);
 	}
 };
 
@@ -91,62 +124,84 @@ protected:
 	thread thd;
 };
 
+class Server_node;
 class Client_node:public Base_node{
-public:
-	void run()
-	{
-		char buffer[BUFLEN];
-		portno = DEFAULTPORT;
-		sprintf(buffer, "%s %d", serverip.c_str(), portno);
-		int n;
-		while(true)
-		{
-			sockfd = socket(AF_INET, SOCK_STREAM, 0);
-			addr.sin_port = htons(portno);
-			if (sockfd < 0)
-			{
-				cerr<<("client: ERROR opening socket\n");
-				perror(NULL);
-				std::this_thread::sleep_for(chrono::seconds(5));
-			}
-			auto start = chrono::system_clock::now();
-
-			if (connect(sockfd, (struct sockaddr *) &addr, sizeof(addr)) < 0)
-			{
-				cerr<<"client: ERROR connecting to host:"<<serverip<<" port:"<<portno;
-				perror(NULL);
-			}
-			auto end = chrono::system_clock::now();
-			cout<<"host: "<<serverip<<"\t\tport: " <<portno<<"\tlatency: "<< (chrono::duration_cast<chrono::microseconds>(end - start).count() / 1000.0)<<"ms\t";
-			start = end;
-
-			n = write(sockfd, buffer, sizeof(buffer));
-			if (n < 0)
-				cerr<<("client: ERROR writing to socket\n");
-			end = chrono::system_clock::now();
-			cout<<"bandwidth: "<< BUFLEN*1000/1024.0/chrono::duration_cast<chrono::microseconds>(end - start).count()<<endl;
-
-			close(sockfd);
-			std::this_thread::sleep_for(chrono::seconds(2));
-		}
-	}
-
-	int init()
+private:
+	void communicate(string serverip, int port)
 	{
 		struct hostent *server;
-		serverip = Util::getLocalIp();
+		int n;
+		char buffer[BUFLEN];
 		server = gethostbyname(serverip.c_str());
-//		server = gethostbyname(LOCALHOST);
+		string cn_info;
 		if (server == NULL)
 		{
-			cerr << "ERROR, no such host!\n";
-			return -1;
+			cerr << "ERROR, no such host! "<< serverip<<endl;
+			return;
 		}
 		memset((char *) &addr, 0, sizeof(addr));
 		addr.sin_family = AF_INET;
 		memcpy((char *) server->h_addr, (char *) &addr.sin_addr.s_addr,
 				server->h_length);
+		sockfd = socket(AF_INET, SOCK_STREAM, 0);
+		addr.sin_port = htons(port);
+		if (sockfd < 0)
+		{
+			cerr<<("client: ERROR opening socket\n");
+			perror(NULL);
+			std::this_thread::sleep_for(chrono::seconds(1));
+			return;
+		}
+		auto start = chrono::system_clock::now();
+		cn_info = serverip+" "+to_string(port);
+		if (connect(sockfd, (struct sockaddr *) &addr, sizeof(addr)) < 0)
+		{
+			cerr<<"client: ERROR connecting to host:"<<serverip<<" port:"<<port;
+			perror(NULL);
+			neighbors.erase(cn_info);
+			return;
+		}
+		auto end = chrono::system_clock::now();
+		cout<<"host: "<<serverip<<"\t\tport: " <<port<<"\tlatency: "<< (chrono::duration_cast<chrono::microseconds>(end - start).count() / 1000.0)<<"ms\t";
+		start = end;
+//		cn_info = sn->getServerID();
+		sprintf(buffer, "%s", serverID.c_str());
+//		cout<<"          buffer_c:"<<buffer;
+		n = write(sockfd, buffer, sizeof(buffer));
+		if (n < 0)
+		{
+			cerr<<("client: ERROR writing to socket\n");
+			return;
+		}
+		end = chrono::system_clock::now();
+		cout<<"bandwidth: "<< BUFLEN*1000/1024.0/chrono::duration_cast<chrono::microseconds>(end - start).count()<<endl;
 
+		close(sockfd);
+	}
+
+public:
+	void run()
+	{
+//		char buffer[BUFLEN];
+		portno = DEFAULTPORT;
+//		sprintf(buffer, "%s %d", serverID.c_str(), portno);
+//		serverID = Util::getLocalIp();
+		insertNode(Util::getLocalIp()+" "+to_string(DEFAULTPORT));
+		while(true)
+		{
+			for( auto i: this->neighbors)
+			{
+				vector<string> v;
+				Util::splitIpPort(i, v);
+//				cout<<"ip: "<<v[0] <<" port: "<< atoi(v[1].c_str())<<endl;
+				communicate(v[0], atoi(v[1].c_str()));
+			}
+			std::this_thread::sleep_for(chrono::seconds(SLEEPDURATION));
+		}
+	}
+
+	int init()
+	{
 		thd = thread([=] {run(); });
 		return 0;
 	}
@@ -154,23 +209,22 @@ public:
 	void insertNode(string neighborid)
 	{
 		neighbors.insert(neighborid);
-		for(auto id:neighbors)
-		{
-			cout<< neighborid<<endl;
-		}
+	}
+
+	void setLocalServer(string id)
+	{
+		serverID = id;
 	}
 
 private:
-	string serverip;
+	string serverID;
 	set<string> neighbors;
+//	Server_node* sn;
 };
 
-class Server_node:public Base_node{
+class Server_node:public Base_node
+{
 public:
-//	Server_node(int port):portno(port)
-//	{
-//	}
-
 	void run()
 	{
 		char buffer[BUFLEN];
@@ -187,7 +241,9 @@ public:
 			n = read(newsockfd, buffer, BUFLEN - 1);
 			if (n < 0)
 				cerr << ("server: ERROR reading from socket\n");
-			cout<<"server: "<<buffer<<endl;
+//			cout<<"buffer: "<<buffer<<"|"<<endl;
+			if(cn)
+				cn->insertNode(buffer);
 
 			n = write(newsockfd, "I got your message", BUFLEN - 1);
 			if (n < 0)
@@ -210,7 +266,7 @@ public:
 		addr.sin_family = AF_INET;
 		addr.sin_addr.s_addr = INADDR_ANY;
 		addr.sin_port = htons(portno);
-		cout << "server try binding port:"<< portno<<"...\n";
+//		cout << "server try binding port:"<< portno<<"...\n";
 		while (bind(sockfd, (struct sockaddr *) &addr, sizeof(addr)) < 0)
 		{
 			addr.sin_port = htons(++portno);
@@ -221,12 +277,36 @@ public:
 				exit(1); // newer com node stops if avaiable port number is greater MAXPORT
 			}
 		}
+		UUID = Util::getLocalIp()+" "+to_string(this->portno);
+		if(cn)
+		{
+			cout<<(Util::getLocalIp()+" "+to_string(portno));
+			cn->insertNode(UUID);
+			cn->setLocalServer(UUID);
+		}
 		cout << "server successfully binds port:"<< portno<<"...\n";
 
 		thd = thread([=] {run(); });
 
 		return 0;
 	}
+
+	void addNeighbor(Client_node* cnp)
+	{
+		cn = cnp;
+		UUID = Util::getLocalIp()+" "+to_string(this->portno);
+		cout<<"serverip: "<<UUID<<endl;
+		cn->insertNode(UUID);
+	}
+
+	string getServerID()
+	{
+		return UUID;
+	}
+
+private:
+	Client_node* cn;
+	string UUID;
 };
 
 class ComNode
@@ -235,36 +315,29 @@ public:
 	ComNode()//:port(DEFAULTPORT)
 	{
 		port = 0;
-//		sn = new Server_node();
-//		cn = new Client_node();
+		sn = new Server_node();
+		cn = new Client_node();
 	}
 
 	void start()
 	{
-		sn.init();
-		cn.init();
+		sn->addNeighbor(cn);
+		sn->init();
+		cn->init();
 
-		sn.join();
-		cn.join();
+		sn->join();
+		cn->join();
 	}
 private:
-	Server_node sn;
-	Client_node cn;
+	Server_node* sn;
+	Client_node* cn;
 	int port;
 };
 
 
 int main(int argc, char *argv[])
 {
-//	cout<<Util::getLocalIp();
-//	return 0;
-//	Server_node sn;
-//	sn.init();
-//	Client_node cn;
-//	cn.init();
-//
-//	sn.join();
-//	cn.join();
+	vector<string>v;
 	ComNode cn;
 	cn.start();
 
