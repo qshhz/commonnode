@@ -1,0 +1,23 @@
+
+install:
+        make (run make command in terminal, it requires c++ 11)
+
+run:(can run multiple instances on single machine)
+./comnode
+
+communication node has two threads: server, client 
+
+feature: communication node will be able to find other unknown nodes(either from local machine or local network) and remove dead nodes automatically,
+
+client by default has two threads running
+1st thread: try to communicate with known local nodes(initially just itself on server binding port) and show the latency and bandwidth from it. if communication fails, the client side will remove the node from its known nodes
+2nd thread: will ping the network from (*.*.*.1 to *.*.*.255) on default port 50000 to find if any unknown nodes exist on local network, if found, add the node to known local nodes
+
+server: 1 thread running
+first it tries to bind port at 50000, increment port number if fails. client will know its server binding port if port binding succeed
+server will update client known local nodes, if any node try to communicate with it.
+
+
+
+
+	

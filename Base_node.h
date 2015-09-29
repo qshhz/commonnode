@@ -16,7 +16,7 @@ using namespace std;
 // newer com node stops if avaiable port number is greater MAXPORT
 #define MAXPORT 60000
 //#define LOCALHOST "127.0.0.1"
-#define SLEEPDURATION 8
+#define SLEEPDURATION 20
 
 class Base_node{
 public:

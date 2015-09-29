@@ -51,7 +51,7 @@ void Client_node::communicate(string serverip, int port)
 		return;
 	}
 	end = chrono::system_clock::now();
-	cout<<"bandwidth: "<< BUFLEN*1000/1024.0/chrono::duration_cast<chrono::microseconds>(end - start).count()<<endl;
+	cout<<"bandwidth: "<< BUFLEN*1000.0*1000/1024/1024/chrono::duration_cast<chrono::microseconds>(end - start).count()<<"MB/secs"<<endl;
 
 	close(sockfd);
 }
