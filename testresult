@@ -1,0 +1,47 @@
+root@ubuntu:/home/gai/workspace/comnode# ./comnode 
+serverip: 10.0.10.231 0
+10.0.10.231 50000server successfully binds port:50000...
+client:  REMOVE DEAD NODE, ERROR connecting to host:10.0.10.231 port:0Connection refused
+host: 10.0.10.231		port: 50000	latency: 0.072ms	bandwidth: 996.016MB/secs
+10.0.10.118 50000 is open
+host: 10.0.10.118		port: 50000	latency: 0.306ms	bandwidth: 593.824MB/secs
+host: 10.0.10.231		port: 50000	latency: 0.119ms	bandwidth: 1470.59MB/secs
+host: 10.0.10.118		port: 50000	latency: 0.257ms	bandwidth: 272.331MB/secs
+host: 10.0.10.231		port: 50000	latency: 0.038ms	bandwidth: 3164.56MB/secs
+host: 10.0.10.118		port: 50000	latency: 0.296ms	bandwidth: 227.48MB/secs
+host: 10.0.10.231		port: 50000	latency: 0.126ms	bandwidth: 1050.42MB/secs
+host: 10.0.10.118		port: 50000	latency: 0.339ms	bandwidth: 479.846MB/secs
+host: 10.0.10.231		port: 50000	latency: 0.122ms	bandwidth: 1037.34MB/secs
+host: 10.0.10.118		port: 50000	latency: 0.311ms	bandwidth: 501.002MB/secs
+host: 10.0.10.231		port: 50000	latency: 0.034ms	bandwidth: 4716.98MB/secs
+host: 10.0.10.118		port: 50000	latency: 0.336ms	bandwidth: 469.925MB/secs
+host: 10.0.10.231		port: 50000	latency: 0.114ms	bandwidth: 1351.35MB/secs
+host: 10.0.10.231		port: 50001	latency: 0.065ms	bandwidth: 1131.22MB/secs
+host: 10.0.10.118		port: 50000	latency: 0.236ms	bandwidth: 560.538MB/secs
+host: 10.0.10.231		port: 50000	latency: 0.023ms	bandwidth: 4310.34MB/secs
+host: 10.0.10.231		port: 50001	latency: 0.02ms	bandwidth: 6410.26MB/secs
+host: 10.0.10.118		port: 50000	latency: 0.33ms	bandwidth: 496.032MB/secs
+host: 10.0.10.231		port: 50000	latency: 0.078ms	bandwidth: 1168.22MB/secs
+host: 10.0.10.231		port: 50001	latency: 0.05ms	bandwidth: 1879.7MB/secs
+host: 10.0.10.231		port: 50002	latency: 0.042ms	bandwidth: 1748.25MB/secs
+host: 10.0.10.118		port: 50000	latency: 0.293ms	bandwidth: 492.126MB/secs
+host: 10.0.10.231		port: 50000	latency: 0.119ms	bandwidth: 1201.92MB/secs
+host: 10.0.10.231		port: 50001	latency: 0.062ms	bandwidth: 1824.82MB/secs
+host: 10.0.10.231		port: 50002	latency: 0.05ms	bandwidth: 1879.7MB/secs
+host: 10.0.10.118		port: 50000	latency: 0.289ms	bandwidth: 249.75MB/secs
+host: 10.0.10.231		port: 50000	latency: 0.129ms	bandwidth: 1131.22MB/secs
+host: 10.0.10.231		port: 50001	latency: 0.065ms	bandwidth: 1152.07MB/secs
+host: 10.0.10.231		port: 50002	latency: 0.074ms	bandwidth: 1184.83MB/secs
+host: 10.0.10.118		port: 50000	latency: 0.291ms	bandwidth: 509.165MB/secs
+host: 10.0.10.231		port: 50000	latency: 0.071ms	bandwidth: 965.251MB/secs
+client:  REMOVE DEAD NODE, ERROR connecting to host:10.0.10.231 port:50001Connection refused
+host: 10.0.10.231		port: 50002	latency: 0.043ms	bandwidth: 2293.58MB/secs
+host: 10.0.10.118		port: 50000	latency: 0.308ms	bandwidth: 248.016MB/secs
+host: 10.0.10.231		port: 50000	latency: 0.112ms	bandwidth: 1136.36MB/secs
+host: 10.0.10.231		port: 50002	latency: 0.061ms	bandwidth: 1824.82MB/secs
+host: 10.0.10.118		port: 50000	latency: 0.25ms	bandwidth: 262.605MB/secs
+host: 10.0.10.231		port: 50000	latency: 0.089ms	bandwidth: 1572.33MB/secs
+client:  REMOVE DEAD NODE, ERROR connecting to host:10.0.10.231 port:50002Connection refused
+host: 10.0.10.231		port: 50000	latency: 0.065ms	bandwidth: 1865.67MB/secs
+host: 10.0.10.118		port: 50000	latency: 0.314ms	bandwidth: 578.704MB/secs
+host: 10.0.10.231		port: 50000	latency: 0.106ms	bandwidth: 1396.65MB/secs

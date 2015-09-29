@@ -17,7 +17,8 @@ server: 1 thread running
 first it tries to bind port at 50000, increment port number if fails. client will know its server binding port if port binding succeed
 server will update client known local nodes, if any node try to communicate with it.
 
-
+test:
+see testresult file, that's one node output
 
 
 	

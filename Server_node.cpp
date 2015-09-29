@@ -52,7 +52,7 @@ int Server_node::init()
 	addr.sin_addr.s_addr = INADDR_ANY;
 	addr.sin_port = htons(portno);
 //		cout << "server try binding port:"<< portno<<"...\n";
-	while (bind(sockfd, (struct sockaddr *) &addr, sizeof(addr)) < 0)
+	while (::bind(sockfd, (struct sockaddr *) &addr, sizeof(addr)) < 0)
 	{
 		addr.sin_port = htons(++portno);
 		cerr <<"server: ERROR on binding! retry with increnment port:"<< portno<<"...\n";
